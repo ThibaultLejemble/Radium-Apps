@@ -12,7 +12,9 @@
 #include <Engine/Renderer/RenderTechnique/RenderTechnique.hpp>
 #include <Engine/Renderer/RenderTechnique/ShaderConfigFactory.hpp>
 #include <Engine/Renderer/Renderers/ForwardRenderer.hpp>
+#include <Engine/System/TimedSystem.hpp>
 #include <Gui/MaterialEditor.hpp>
+#include <GuiBase/Timeline/Timeline.h>
 #include <GuiBase/TreeModel/EntityTreeModel.hpp>
 #include <GuiBase/Utils/KeyMappingManager.hpp>
 #include <GuiBase/Utils/qt_utils.hpp>
@@ -62,6 +64,27 @@ MainWindow::MainWindow( QWidget* parent ) : MainWindowInterface( parent ) {
     viewerwidget->setAutoFillBackground( false );
 
     setCentralWidget( viewerwidget );
+
+    // Register the timeline if there is a TimeSystem
+    auto system = Ra::Engine::RadiumEngine::getInstance()->getSystem( "TimeSystem" );
+    if ( auto timeSystem = static_cast<Ra::Engine::TimeSystem*>( system ) )
+    {
+        m_timeline = new Ra::GuiBase::Timeline( this );
+        m_timeline->onChangeEnd( timeSystem->getEndTime() );
+        dockWidget_2->setWidget( m_timeline );
+    }
+    else
+    {
+        // otherwise remove time actions and timeline's dockWidget
+        removeDockWidget( dockWidget_2 );
+        delete dockWidget_2;
+        removeAction( actionPlay );
+        delete actionPlay;
+        removeAction( actionStep );
+        delete actionStep;
+        removeAction( actionStop );
+        delete actionStop;
+    }
 
     setWindowIcon( QPixmap( ":/Resources/Icons/RadiumIcon.png" ) );
     setWindowTitle( QString( "Radium Engine" ) );
@@ -134,6 +157,27 @@ void MainWindow::createConnections() {
         actionReload_configuration, &QAction::triggered, this, &MainWindow::reloadConfiguration );
     connect(
         actionLoad_configuration_file, &QAction::triggered, this, &MainWindow::loadConfiguration );
+
+    // Timeline setup
+    if ( m_timeline )
+    {
+        connect( m_timeline, &Ra::GuiBase::Timeline::playClicked, this, &MainWindow::timelinePlay );
+        connect(
+            m_timeline, &Ra::GuiBase::Timeline::cursorChanged, this, &MainWindow::timelineGoTo );
+        connect( m_timeline,
+                 &Ra::GuiBase::Timeline::startChanged,
+                 this,
+                 &MainWindow::timelineStartChanged );
+        connect(
+            m_timeline, &Ra::GuiBase::Timeline::endChanged, this, &MainWindow::timelineEndChanged );
+        connect( m_timeline,
+                 &Ra::GuiBase::Timeline::setPingPong,
+                 this,
+                 &MainWindow::timelineSetPingPong );
+        connect( m_timeline, &Ra::GuiBase::Timeline::keyPoseChanged, [=]( Scalar ) {
+            mainApp->askForUpdate();
+        } );
+    }
 
     // Loading setup.
     connect( this, &MainWindow::fileLoading, mainApp, &Ra::GuiBase::BaseApplication::loadFile );
@@ -311,6 +355,10 @@ GuiBase::SelectionManager* MainWindow::getSelectionManager() {
     return m_selectionManager;
 }
 
+GuiBase::Timeline* MainWindow::getTimeline() {
+    return m_timeline;
+}
+
 void Gui::MainWindow::toggleCirclePicking( bool on ) {
     centralWidget()->setMouseTracking( on );
 }
@@ -353,19 +401,21 @@ void MainWindow::onSelectionChanged( const QItemSelection& /*selected*/,
             m_editRenderObjectButton->setEnabled( true );
 
             m_materialEditor->changeRenderObject( ent.m_roIndex );
-            const std::string& shaderName = mainApp->m_engine->getRenderObjectManager()
-                                                ->getRenderObject( ent.m_roIndex )
-                                                ->getRenderTechnique()
-                                                ->getMaterial()
-                                                ->getMaterialName();
-            CORE_ASSERT( m_currentShaderBox->findText( shaderName.c_str() ) != -1,
-                         "RO shaders must be already added to the list" );
-            m_currentShaderBox->setCurrentText( shaderName.c_str() );
-            // m_currentShaderBox->setEnabled( true ); // commented out, as there is no simple way
+            // commented out, as there is no simple way
             // to change the material type
+            // const std::string& shaderName = mainApp->m_engine->getRenderObjectManager()
+            //                                     ->getRenderObject( ent.m_roIndex )
+            //                                     ->getRenderTechnique()
+            //                                     ->getMaterial()
+            //                                     ->getMaterialName();
+            // CORE_ASSERT( m_currentShaderBox->findText( shaderName.c_str() ) != -1,
+            //              "RO shaders must be already added to the list" );
+            // m_currentShaderBox->setCurrentText( shaderName.c_str() );
+            // m_currentShaderBox->setEnabled( true );
         }
         else
             m_currentShaderBox->setCurrentText( "" );
+        if ( m_timeline ) { m_timeline->selectionChanged( ent ); }
     }
     else
     {
@@ -374,6 +424,7 @@ void MainWindow::onSelectionChanged( const QItemSelection& /*selected*/,
         m_selectedItemName->setText( "" );
         m_editRenderObjectButton->setEnabled( false );
         m_materialEditor->hide();
+        if ( m_timeline ) { m_timeline->selectionChanged( ItemEntry() ); }
     }
 }
 
@@ -565,6 +616,18 @@ void MainWindow::onRendererReady() {
 
 void MainWindow::onFrameComplete() {
     tab_edition->updateValues();
+    auto system     = Ra::Engine::RadiumEngine::getInstance()->getSystem( "TimeSystem" );
+    auto timeSystem = static_cast<Ra::Engine::TimeSystem*>( system );
+    if ( timeSystem && m_timeline )
+    {
+        // update timeline only if time changed, to allow manipulation of keyframed objects
+        if ( !Ra::Core::Math::areApproxEqual( m_timeline->getTime(), timeSystem->getTime() ) )
+        {
+            m_lockTimeSystem = true;
+            m_timeline->onChangeCursor( double( timeSystem->getTime() ), true );
+            m_lockTimeSystem = false;
+        }
+    }
 }
 
 void MainWindow::addRenderer( const std::string& name, std::shared_ptr<Engine::Renderer> e ) {
@@ -724,6 +787,72 @@ void MainWindow::addPluginPath() {
 void MainWindow::clearPluginPaths() {
     mainApp->clearPluginDirectories();
 }
+
+// macros to call TimeSystem's (if it exists) method X and potentially ask for
+// Viewer's update or continuous update.
+#define TIME_SYSTEM_DO( X )                                                                        \
+    {                                                                                              \
+        auto system = Ra::Engine::RadiumEngine::getInstance()->getSystem( "TimeSystem" );          \
+        if ( auto timeSystem = static_cast<Ra::Engine::TimeSystem*>( system ) ) { timeSystem->X; } \
+    }
+
+#define TIME_SYSTEM_DO_AND_UPDATE( X )                                                    \
+    {                                                                                     \
+        auto system = Ra::Engine::RadiumEngine::getInstance()->getSystem( "TimeSystem" ); \
+        if ( auto timeSystem = static_cast<Ra::Engine::TimeSystem*>( system ) )           \
+        {                                                                                 \
+            timeSystem->X;                                                                \
+            mainApp->askForUpdate();                                                      \
+        }                                                                                 \
+    }
+
+#define TIME_SYSTEM_DO_AND_CONTINUOUS_UPDATE( X, on )                                     \
+    {                                                                                     \
+        auto system = Ra::Engine::RadiumEngine::getInstance()->getSystem( "TimeSystem" ); \
+        if ( auto timeSystem = static_cast<Ra::Engine::TimeSystem*>( system ) )           \
+        {                                                                                 \
+            timeSystem->X;                                                                \
+            mainApp->setContinuousUpdate( on );                                           \
+        }                                                                                 \
+    }
+
+void MainWindow::on_actionPlay_triggered( bool checked ) {
+    if ( !m_lockTimeSystem ) { TIME_SYSTEM_DO_AND_CONTINUOUS_UPDATE( play( checked ), checked ); }
+    if ( m_timeline != nullptr ) { m_timeline->onSetPlay( checked ); }
+}
+
+void MainWindow::on_actionStop_triggered() {
+    if ( !m_lockTimeSystem ) { TIME_SYSTEM_DO_AND_UPDATE( reset() ); }
+    actionPlay->setChecked( false );
+    if ( m_timeline != nullptr ) { m_timeline->onSetPlay( false ); }
+}
+
+void MainWindow::on_actionStep_triggered() {
+    if ( !m_lockTimeSystem ) { TIME_SYSTEM_DO_AND_UPDATE( step() ); }
+}
+
+void MainWindow::timelinePlay( bool play ) {
+    actionPlay->setChecked( play );
+    if ( !m_lockTimeSystem ) { TIME_SYSTEM_DO_AND_CONTINUOUS_UPDATE( play( play ), play ); }
+}
+
+void MainWindow::timelineGoTo( double t ) {
+    if ( !m_lockTimeSystem ) { TIME_SYSTEM_DO_AND_UPDATE( goTo( Scalar( t ) ) ); }
+}
+
+void MainWindow::timelineStartChanged( double t ) {
+    if ( !m_lockTimeSystem ) { TIME_SYSTEM_DO_AND_UPDATE( setStartTime( Scalar( t ) ) ); }
+}
+
+void MainWindow::timelineEndChanged( double t ) {
+    if ( !m_lockTimeSystem ) { TIME_SYSTEM_DO_AND_UPDATE( setEndTime( Scalar( t ) ) ); }
+}
+
+void MainWindow::timelineSetPingPong( bool status ) {
+    if ( !m_lockTimeSystem ) { TIME_SYSTEM_DO_AND_UPDATE( setPingPongMode( status ) ); }
+}
+
+#undef TIME_SYSTEM_DO
 
 } // namespace Gui
 } // namespace Ra
