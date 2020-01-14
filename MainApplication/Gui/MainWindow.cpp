@@ -85,6 +85,8 @@ MainWindow::MainWindow( QWidget* parent ) : MainWindowInterface( parent ) {
             Ui::MainWindow::dockWidget->setVisible(!b);
         },
         QKeySequence(Qt::Key_Q));
+    Ui::MainWindow::dockWidget->setVisible( false );
+
 
     mainApp->framesCountForStatsChanged( uint( m_avgFramesCount->value() ) );
 
