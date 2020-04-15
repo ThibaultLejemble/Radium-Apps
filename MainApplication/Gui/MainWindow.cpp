@@ -380,42 +380,42 @@ void MainWindow::handlePicking( const Engine::Renderer::PickingResult& pickingRe
 
 void MainWindow::onSelectionChanged( const QItemSelection& /*selected*/,
                                      const QItemSelection& /*deselected*/ ) {
-    m_currentShaderBox->setEnabled( false );
+    // m_currentShaderBox->setEnabled( false );
 
-    if ( m_selectionManager->hasSelection() )
-    {
-        const ItemEntry& ent = m_selectionManager->currentItem();
-        emit selectedItem( ent );
-        m_selectedItemName->setText(
-            QString::fromStdString( getEntryName( mainApp->getEngine(), ent ) ) );
-        m_editRenderObjectButton->setEnabled( false );
+    // if ( m_selectionManager->hasSelection() )
+    // {
+    //     const ItemEntry& ent = m_selectionManager->currentItem();
+    //     emit selectedItem( ent );
+    //     m_selectedItemName->setText(
+    //         QString::fromStdString( getEntryName( mainApp->getEngine(), ent ) ) );
+    //     m_editRenderObjectButton->setEnabled( false );
 
-        if ( ent.isRoNode() )
-        {
-            m_editRenderObjectButton->setEnabled( true );
+    //     if ( ent.isRoNode() )
+    //     {
+    //         m_editRenderObjectButton->setEnabled( true );
 
-            m_materialEditor->changeRenderObject( ent.m_roIndex );
-            auto material = mainApp->m_engine->getRenderObjectManager()
-                                ->getRenderObject( ent.m_roIndex )
-                                ->getMaterial();
-            const std::string& shaderName = material->getMaterialName();
-            CORE_ASSERT( m_currentShaderBox->findText( shaderName.c_str() ) != -1,
-                         "RO shaders must be already added to the list" );
-            m_currentShaderBox->setCurrentText( shaderName.c_str() );
-            // m_currentShaderBox->setEnabled( true ); // commented out, as there is no simple way
-            // to change the material type
-        }
-        else
-            m_currentShaderBox->setCurrentText( "" );
-    }
-    else
-    {
-        m_currentShaderBox->setCurrentText( "" );
-        emit selectedItem( ItemEntry() );
-        m_selectedItemName->setText( "" );
-        m_editRenderObjectButton->setEnabled( false );
-        m_materialEditor->hide();
-    }
+    //         m_materialEditor->changeRenderObject( ent.m_roIndex );
+    //         auto material = mainApp->m_engine->getRenderObjectManager()
+    //                             ->getRenderObject( ent.m_roIndex )
+    //                             ->getMaterial();
+    //         const std::string& shaderName = material->getMaterialName();
+    //         CORE_ASSERT( m_currentShaderBox->findText( shaderName.c_str() ) != -1,
+    //                      "RO shaders must be already added to the list" );
+    //         m_currentShaderBox->setCurrentText( shaderName.c_str() );
+    //         // m_currentShaderBox->setEnabled( true ); // commented out, as there is no simple way
+    //         // to change the material type
+    //     }
+    //     else
+    //         m_currentShaderBox->setCurrentText( "" );
+    // }
+    // else
+    // {
+    //     m_currentShaderBox->setCurrentText( "" );
+    //     emit selectedItem( ItemEntry() );
+    //     m_selectedItemName->setText( "" );
+    //     m_editRenderObjectButton->setEnabled( false );
+    //     m_materialEditor->hide();
+    // }
 }
 
 void MainWindow::closeEvent( QCloseEvent* event ) {
@@ -723,12 +723,12 @@ void MainWindow::postLoadFile( const std::string& filename ) {
     for ( const auto& ro :
           Engine::RadiumEngine::getInstance()->getRenderObjectManager()->getRenderObjects() )
     {
-        if ( ro->getType() == Engine::RenderObjectType::Geometry )
-        {
-            auto material                 = ro->getMaterial();
-            const std::string& shaderName = material->getMaterialName();
-            m_currentShaderBox->addItem( QString( shaderName.c_str() ) );
-        }
+        // if ( ro->getType() == Engine::RenderObjectType::Geometry )
+        // {
+            // auto material                 = ro->getMaterial();
+            // const std::string& shaderName = material->getMaterialName();
+            // m_currentShaderBox->addItem( QString( shaderName.c_str() ) );
+        // }
     }
 
     fitCamera();
