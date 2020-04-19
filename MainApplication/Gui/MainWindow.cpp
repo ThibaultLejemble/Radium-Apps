@@ -199,11 +199,11 @@ void MainWindow::createConnections() {
     connect( this, &MainWindow::selectedItem, mainApp, &MainApplication::onSelectedItem );
 
     // Enable changing shaders
-    connect(
-        m_currentShaderBox,
-        static_cast<void ( QComboBox::* )( const QString& )>( &QComboBox::currentIndexChanged ),
-        this,
-        &MainWindow::changeRenderObjectShader );
+    // connect(
+    //     m_currentShaderBox,
+    //     static_cast<void ( QComboBox::* )( const QString& )>( &QComboBox::currentIndexChanged ),
+    //     this,
+    //     &MainWindow::changeRenderObjectShader );
 
     // RO Stuff
     connect(
@@ -717,19 +717,19 @@ void MainWindow::fitCamera() {
 void MainWindow::postLoadFile( const std::string& filename ) {
     m_viewer->getRenderer()->buildAllRenderTechniques();
     m_selectionManager->clear();
-    m_currentShaderBox->clear();
-    m_currentShaderBox->setEnabled( false );
-    m_currentShaderBox->addItem( "" ); // add empty item
-    for ( const auto& ro :
-          Engine::RadiumEngine::getInstance()->getRenderObjectManager()->getRenderObjects() )
-    {
+    // m_currentShaderBox->clear();
+    // m_currentShaderBox->setEnabled( false );
+    // m_currentShaderBox->addItem( "" ); // add empty item
+    // for ( const auto& ro :
+          // Engine::RadiumEngine::getInstance()->getRenderObjectManager()->getRenderObjects() )
+    // {
         // if ( ro->getType() == Engine::RenderObjectType::Geometry )
         // {
             // auto material                 = ro->getMaterial();
             // const std::string& shaderName = material->getMaterialName();
             // m_currentShaderBox->addItem( QString( shaderName.c_str() ) );
         // }
-    }
+    // }
 
     fitCamera();
 
