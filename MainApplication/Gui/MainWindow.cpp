@@ -731,7 +731,7 @@ void MainWindow::postLoadFile( const std::string& filename ) {
         // }
     // }
 
-    fitCamera();
+    // fitCamera();
 
     // TODO : find a better way to activate loaded camera
     // If a camera is in the loaded scene, use it, else, use default
