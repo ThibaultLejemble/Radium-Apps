@@ -107,6 +107,10 @@ class MainWindow : public Ra::GuiBase::MainWindowInterface, private Ui::MainWind
     /// Show or hide all render objects
     void showHideAllRO();
 
+    // Point cloud rendering
+    void adjustSplatSize();
+    void updateSplatSizeRatio(Scalar ratio);
+
   signals:
     /// Emitted when the frame loads
     void fileLoading( const QString path );

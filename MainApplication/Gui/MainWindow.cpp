@@ -229,6 +229,10 @@ void MainWindow::createConnections() {
              mainApp,
              &Ra::GuiBase::BaseApplication::setRecordTimings );
 
+    // Point cloud rendering
+    connect( m_splatSize, &QSlider::valueChanged, this, &MainWindow::updateSplatSizeRatio);
+    connect( m_splatAdjust, &QPushButton::clicked, this, &MainWindow::adjustSplatSize);
+
     // Material editor
     connect( m_materialEditor.get(),
              &MaterialEditor::materialChanged,
@@ -571,6 +575,19 @@ void Gui::MainWindow::showHideAllRO() {
         if ( item.isValid() && item.isSelectable() )
         { m_itemModel->setData( idx, allEntityInvisible, Qt::CheckStateRole ); }
     }
+    mainApp->askForUpdate();
+}
+
+void Gui::MainWindow::adjustSplatSize() {
+    const Scalar size = mainApp->getEngine()->computeSceneAabb().diagonal().norm();
+    m_viewer->getRenderer()->setSceneSize(size);
+    mainApp->askForUpdate();
+}
+
+void Gui::MainWindow::updateSplatSizeRatio(Scalar ratio) {
+    const Scalar t = ratio / m_splatSize->maximum(); // in (0,1)
+    const Scalar splatRadiusRatio = 0.02 * t; // max radius = 2% of aabb diag
+    m_viewer->getRenderer()->setSplatRadiusRatio(splatRadiusRatio);
     mainApp->askForUpdate();
 }
 
